@@ -48,6 +48,29 @@ MODELS = [
     "grok-3-mini",
 ]
 
+# ── Free tier limits (GitHub Models, free account) ────────────────────────────
+# Source: GitHub Models docs / community discussions (April 2025)
+# Format: (max_input_tokens, max_output_tokens, req_per_day)
+FREE_TIER = {
+    "gpt-4o":                                   (8_000, 4_000,  50),
+    "gpt-4o-mini":                              (8_000, 4_000,  50),
+    "Phi-4":                                    (8_000, 4_000, 150),
+    "Llama-3.3-70B-Instruct":                  (8_000, 4_000,  50),
+    "Llama-3.2-90B-Vision-Instruct":           (8_000, 4_000,  50),
+    "Llama-3.2-11B-Vision-Instruct":           (8_000, 4_000, 150),
+    "Llama-4-Scout-17B-16E-Instruct":          (8_000, 4_000, 150),  # Low tier
+    "Llama-4-Maverick-17B-128E-Instruct-FP8":  (8_000, 4_000,  50),  # High tier
+    "Meta-Llama-3.1-405B-Instruct":            (8_000, 4_000,  50),
+    "Meta-Llama-3.1-8B-Instruct":              (8_000, 4_000, 150),
+    "Codestral-2501":                           (8_000, 4_000,  50),  # High tier
+    "mistral-medium-2505":                      (8_000, 4_000,  50),
+    "DeepSeek-R1":                              (4_096, 4_096,   8),  # Restricted
+    "DeepSeek-R1-0528":                         (4_096, 4_096,   8),  # Restricted
+    "DeepSeek-V3-0324":                         (8_000, 4_000,  50),
+    "grok-3":                                   (8_000, 4_000,  50),
+    "grok-3-mini":                              (8_000, 4_000, 150),
+}
+
 # ── Pricing table (Azure AI Foundry pay-as-you-go, USD per 1M tokens) ─────────
 # Source: Azure AI Foundry model catalog pricing (April 2025)
 PRICING = {
@@ -160,13 +183,15 @@ def print_results(results: list[Result]):
               f"{r.completion_tokens:>6}  {price_in:>8}  {price_out:>9}  {resp_short}")
 
     # ── Full pricing table ─────────────────────────────────────────────────
-    print("\n" + "═" * 90)
-    print(f"{'PRICING TABLE  (Azure AI Foundry, pay-as-you-go)':^90}")
-    print("═" * 90)
-    print(f"{'Model':<48}  {'Input $/1M':>12}  {'Output $/1M':>12}  {'Cost/1k ctx':>12}")
-    print("─" * 90)
+    print("\n" + "═" * 115)
+    print(f"{'PRICING TABLE  (Azure AI Foundry, pay-as-you-go)':^115}")
+    print("═" * 115)
+    print(f"{'Model':<48}  {'Input $/1M':>12}  {'Output $/1M':>12}  {'Cost/1k ctx':>12}  "
+          f"{'Free in-tok':>11}  {'Free out-tok':>12}  {'Req/day':>7}")
+    print("─" * 115)
     for r in sorted(ok, key=lambda x: PRICING.get(x.model, (0, 0))[0]):
         p = PRICING.get(r.model, (None, None))
+        ft = FREE_TIER.get(r.model, (None, None, None))
         if p[0] is None:
             pi, po, pc = "—", "—", "—"
         else:
@@ -174,7 +199,13 @@ def print_results(results: list[Result]):
             po = f"${p[1]:.2f}"
             # approx cost for a 1k-token context + 200-token response
             pc = f"${p[0]/1000 + p[1]/1000*0.2:.5f}"
-        print(f"{r.model:<48}  {pi:>12}  {po:>12}  {pc:>12}")
+        if ft[0] is None:
+            fi, fo, fr = "—", "—", "—"
+        else:
+            fi = f"{ft[0]:,}"
+            fo = f"{ft[1]:,}"
+            fr = str(ft[2])
+        print(f"{r.model:<48}  {pi:>12}  {po:>12}  {pc:>12}  {fi:>11}  {fo:>12}  {fr:>7}")
 
     # ── Failed models ──────────────────────────────────────────────────────
     if err:
