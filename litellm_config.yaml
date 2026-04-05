@@ -11,6 +11,6 @@ model_list:
 
   - model_name: deepseek-v3
     litellm_params:
-      model: openai/DeepSeek-V3
+      model: openai/DeepSeek-V3.2-Speciale
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
       api_key: os.environ/AZURE_AI_KEY

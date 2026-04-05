@@ -28,7 +28,7 @@ MAX_TOKENS = 80
 TIMEOUT    = 60
 
 MODELS: dict[str, str] = {
-    "deepseek-v3": "DeepSeek-V3",   # proxy alias -> Azure model ID
+    "deepseek-v3": "DeepSeek-V3.2-Speciale",   # proxy alias -> Azure deployment name
 }
 
 # ── .env loader ────────────────────────────────────────────────────────────────
