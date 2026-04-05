@@ -10,7 +10,11 @@ services:
       - "--config"
       - "/app/config.yaml"
     environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_TOKEN_1=${GITHUB_TOKEN_1}
+      - GITHUB_TOKEN_2=${GITHUB_TOKEN_2}
+      - GITHUB_TOKEN_3=${GITHUB_TOKEN_3}
+      - GITHUB_TOKEN_4=${GITHUB_TOKEN_4}
+      - GITHUB_TOKEN_5=${GITHUB_TOKEN_5}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
       - STORE_MODEL_IN_DB=False
     restart: unless-stopped
