@@ -48,27 +48,27 @@ MODELS = [
     "grok-3-mini",
 ]
 
-# ── Free tier limits (GitHub Models, free account) ────────────────────────────
-# Source: GitHub Models docs / community discussions (April 2025)
-# Format: (max_input_tokens, max_output_tokens, req_per_day)
-FREE_TIER = {
-    "gpt-4o":                                   (8_000, 4_000,  50),
-    "gpt-4o-mini":                              (8_000, 4_000,  50),
-    "Phi-4":                                    (8_000, 4_000, 150),
-    "Llama-3.3-70B-Instruct":                  (8_000, 4_000,  50),
-    "Llama-3.2-90B-Vision-Instruct":           (8_000, 4_000,  50),
-    "Llama-3.2-11B-Vision-Instruct":           (8_000, 4_000, 150),
-    "Llama-4-Scout-17B-16E-Instruct":          (8_000, 4_000, 150),  # Low tier
-    "Llama-4-Maverick-17B-128E-Instruct-FP8":  (8_000, 4_000,  50),  # High tier
-    "Meta-Llama-3.1-405B-Instruct":            (8_000, 4_000,  50),
-    "Meta-Llama-3.1-8B-Instruct":              (8_000, 4_000, 150),
-    "Codestral-2501":                           (8_000, 4_000,  50),  # High tier
-    "mistral-medium-2505":                      (8_000, 4_000,  50),
-    "DeepSeek-R1":                              (4_096, 4_096,   8),  # Restricted
-    "DeepSeek-R1-0528":                         (4_096, 4_096,   8),  # Restricted
-    "DeepSeek-V3-0324":                         (8_000, 4_000,  50),
-    "grok-3":                                   (8_000, 4_000,  50),
-    "grok-3-mini":                              (8_000, 4_000, 150),
+# ── Pay-as-you-go limits (GitHub Models / Azure AI Foundry) ───────────────────
+# Source: Azure AI Foundry model catalog (April 2025)
+# Format: (max_context_tokens, tpm_str, rpm_str)  rpm="" means derived from TPM
+LIMITS = {
+    "gpt-4o":                                   (128_000, "300K-1M",   "300-1K"),
+    "gpt-4o-mini":                              (128_000, "1M-2M",     "10K-20K"),
+    "Phi-4":                                    (128_000, "~2M",       ""),
+    "Llama-3.3-70B-Instruct":                  (128_000, "~500K",     ""),
+    "Llama-3.2-90B-Vision-Instruct":           (128_000, "~500K",     ""),
+    "Llama-3.2-11B-Vision-Instruct":           (128_000, "~1M",       ""),
+    "Llama-4-Scout-17B-16E-Instruct":          (128_000, "~1M",       ""),
+    "Llama-4-Maverick-17B-128E-Instruct-FP8":  (128_000, "~1M",       ""),
+    "Meta-Llama-3.1-405B-Instruct":            (128_000, "~150-300K", ""),
+    "Meta-Llama-3.1-8B-Instruct":              (128_000, "~2M",       ""),
+    "Codestral-2501":                           (256_000, "~1M",       ""),
+    "mistral-medium-2505":                      ( 32_000, "~300K",     ""),
+    "DeepSeek-R1":                              (128_000, "~150-300K", ""),
+    "DeepSeek-R1-0528":                         (128_000, "~150-300K", ""),
+    "DeepSeek-V3-0324":                         (128_000, "~1M",       ""),
+    "grok-3":                                   (128_000, "~300K",     ""),
+    "grok-3-mini":                              (128_000, "~1M",       ""),
 }
 
 # ── Pricing table (Azure AI Foundry pay-as-you-go, USD per 1M tokens) ─────────
@@ -183,15 +183,16 @@ def print_results(results: list[Result]):
               f"{r.completion_tokens:>6}  {price_in:>8}  {price_out:>9}  {resp_short}")
 
     # ── Full pricing table ─────────────────────────────────────────────────
-    print("\n" + "═" * 115)
-    print(f"{'PRICING TABLE  (Azure AI Foundry, pay-as-you-go)':^115}")
-    print("═" * 115)
+    W = 120
+    print("\n" + "═" * W)
+    print(f"{'PRICING TABLE  (Azure AI Foundry, pay-as-you-go)':^{W}}")
+    print("═" * W)
     print(f"{'Model':<48}  {'Input $/1M':>12}  {'Output $/1M':>12}  {'Cost/1k ctx':>12}  "
-          f"{'Free in-tok':>11}  {'Free out-tok':>12}  {'Req/day':>7}")
-    print("─" * 115)
+          f"{'Max ctx':>8}  {'TPM':>10}  {'RPM':>10}")
+    print("─" * W)
     for r in sorted(ok, key=lambda x: PRICING.get(x.model, (0, 0))[0]):
-        p = PRICING.get(r.model, (None, None))
-        ft = FREE_TIER.get(r.model, (None, None, None))
+        p  = PRICING.get(r.model, (None, None))
+        lm = LIMITS.get(r.model, (None, None, None))
         if p[0] is None:
             pi, po, pc = "—", "—", "—"
         else:
@@ -199,13 +200,13 @@ def print_results(results: list[Result]):
             po = f"${p[1]:.2f}"
             # approx cost for a 1k-token context + 200-token response
             pc = f"${p[0]/1000 + p[1]/1000*0.2:.5f}"
-        if ft[0] is None:
-            fi, fo, fr = "—", "—", "—"
+        if lm[0] is None:
+            lctx, ltpm, lrpm = "—", "—", "—"
         else:
-            fi = f"{ft[0]:,}"
-            fo = f"{ft[1]:,}"
-            fr = str(ft[2])
-        print(f"{r.model:<48}  {pi:>12}  {po:>12}  {pc:>12}  {fi:>11}  {fo:>12}  {fr:>7}")
+            lctx = f"{lm[0]//1000}K"
+            ltpm = lm[1]
+            lrpm = lm[2] if lm[2] else "~derived"
+        print(f"{r.model:<48}  {pi:>12}  {po:>12}  {pc:>12}  {lctx:>8}  {ltpm:>10}  {lrpm:>10}")
 
     # ── Failed models ──────────────────────────────────────────────────────
     if err:
