@@ -9,6 +9,7 @@ Usage:
   python tools/test_vision_quota.py --proxy       # via LiteLLM proxy instead of direct
 """
 
+import base64
 import json
 import os
 import subprocess
@@ -23,7 +24,7 @@ PROXY_URL   = "http://localhost:4003/v1/chat/completions"
 DIRECT_URL  = "https://models.inference.ai.azure.com/chat/completions"
 MODEL_ALIAS = "llama-4-scout"
 MODEL_ID    = "Llama-4-Scout-17B-16E-Instruct"
-IMAGE_URL   = "https://goodal.cz/kid/dog85.jpg"
+IMAGE_URL   = "https://goodal.cz/kid/dog85.jpg"  # fetched once at startup → sent as base64
 QUESTION    = "Is it a dog? Answer yes or no."
 MAX_TOKENS  = 20
 TIMEOUT     = 60
@@ -62,15 +63,26 @@ GITHUB_TOKEN = (
     or _get_gh_token()
 )
 
+# ── Image fetch (once at startup) ────────────────────────────────────────────────
+
+def fetch_image_b64(url: str) -> str:
+    """Download image and return as base64 data URI."""
+    print(f"Fetching image from {url} …", end=" ", flush=True)
+    with urllib.request.urlopen(url, timeout=15) as resp:
+        mime = resp.headers.get_content_type() or "image/jpeg"
+        data = base64.b64encode(resp.read()).decode()
+    print(f"OK ({len(data)//1024} KB b64)")
+    return f"data:{mime};base64,{data}"
+
 # ── Request builder ──────────────────────────────────────────────────────────────
 
-def build_body(model: str) -> dict:
+def build_body(model: str, image_data_uri: str) -> dict:
     return {
         "model": model,
         "messages": [{
             "role": "user",
             "content": [
-                {"type": "image_url", "image_url": {"url": IMAGE_URL}},
+                {"type": "image_url", "image_url": {"url": image_data_uri}},
                 {"type": "text", "text": QUESTION},
             ],
         }],
@@ -86,16 +98,16 @@ def post(url: str, headers: dict, body: dict) -> dict:
 
 # ── Single call ──────────────────────────────────────────────────────────────────
 
-def call_once(via_proxy: bool) -> tuple[bool, float, int, int, str]:
+def call_once(via_proxy: bool, image_data_uri: str) -> tuple[bool, float, int, int, str]:
     """Returns (ok, latency_ms, prompt_tokens, completion_tokens, response_or_error)."""
     if via_proxy:
         url     = PROXY_URL
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {PROXY_KEY}"}
-        body    = build_body(MODEL_ALIAS)
+        body    = build_body(MODEL_ALIAS, image_data_uri)
     else:
         url     = DIRECT_URL
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {GITHUB_TOKEN}"}
-        body    = build_body(MODEL_ID)
+        body    = build_body(MODEL_ID, image_data_uri)
 
     t0 = time.monotonic()
     try:
@@ -128,7 +140,10 @@ def main():
     print(f"Image : {IMAGE_URL}")
     print(f"Query : {QUESTION!r}")
     print(f"Repeat: up to {repeats}x  |  max_tokens={MAX_TOKENS}")
-    print(f"{'═'*90}\n")
+
+    image_data_uri = fetch_image_b64(IMAGE_URL)
+
+    print(f"\n{'═'*90}\n")
     print(f"  {'#':>3}  {'Status':<6}  {'Latency':>9}  {'In':>7}  {'Out':>5}  {'TotalIn':>9}  Response")
     print(f"  {'─'*86}")
 
@@ -136,7 +151,7 @@ def main():
     run_start    = time.monotonic()
 
     for i in range(1, repeats + 1):
-        ok, latency, pt, ct, resp = call_once(via_proxy)
+        ok, latency, pt, ct, resp = call_once(via_proxy, image_data_uri)
         total_prompt += pt
         status = "OK   " if ok else "FAIL "
         resp_short = resp[:48] + "…" if len(resp) > 48 else resp
