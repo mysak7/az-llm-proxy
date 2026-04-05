@@ -30,6 +30,7 @@ TIMEOUT    = 60
 MODELS: dict[str, str] = {
     "DeepSeek-V3.2-Speciale": "DeepSeek-V3.2-Speciale",
     "Phi-4-reasoning":        "Phi-4-reasoning",
+    "Phi-4":                  "Phi-4",
 }
 
 # ── .env loader ────────────────────────────────────────────────────────────────
