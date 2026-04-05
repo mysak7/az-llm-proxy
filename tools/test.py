@@ -28,8 +28,8 @@ MAX_TOKENS = 200
 TIMEOUT    = 60
 
 MODELS: dict[str, str] = {
-    "deepseek-v3":     "DeepSeek-V3.2-Speciale",
-    "phi-4-reasoning": "Phi-4-reasoning",
+    "DeepSeek-V3.2-Speciale": "DeepSeek-V3.2-Speciale",
+    "Phi-4-reasoning":        "Phi-4-reasoning",
 }
 
 # ── .env loader ────────────────────────────────────────────────────────────────

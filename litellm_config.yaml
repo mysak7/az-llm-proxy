@@ -9,13 +9,13 @@ litellm_settings:
 
 model_list:
 
-  - model_name: deepseek-v3
+  - model_name: DeepSeek-V3.2-Speciale
     litellm_params:
       model: openai/DeepSeek-V3.2-Speciale
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
       api_key: os.environ/AZURE_AI_KEY
 
-  - model_name: phi-4-reasoning
+  - model_name: Phi-4-reasoning
     litellm_params:
       model: openai/Phi-4-reasoning
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
