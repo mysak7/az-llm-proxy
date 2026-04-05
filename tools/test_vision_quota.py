@@ -25,7 +25,7 @@ DIRECT_URL  = "https://models.inference.ai.azure.com/chat/completions"
 MODEL_ALIAS = "llama-4-scout"
 MODEL_ID    = "Llama-4-Scout-17B-16E-Instruct"
 IMAGE_URL   = "https://goodal.cz/kid/dog85.jpg"  # fetched once at startup → sent as base64
-QUESTION    = "Is it a dog? Answer yes or no."
+QUESTION    = "Is it a car? Answer yes or no."
 MAX_TOKENS  = 20
 TIMEOUT     = 60
 DEFAULT_REPEATS = 30
@@ -143,16 +143,11 @@ def main():
     print(f"Repeat: up to {repeats}x  |  max_tokens={MAX_TOKENS}")
 
     image_data_uri, image_bytes = fetch_image_b64(IMAGE_URL)
-    # Llama 4 Scout uses 14x14 patch grid on 560px tiles → each tile ≈ 196 tokens.
-    # Rough estimate: assume image is processed at a single 560x560 tile.
-    IMAGE_TOKENS_ESTIMATE = 196  # conservative lower-bound; real cost is likely higher
-
-    print(f"NOTE: GitHub Models API does NOT report image tokens in usage stats.")
-    print(f"      Image size: {image_bytes // 1024} KB  |  estimated image tokens/request: ~{IMAGE_TOKENS_ESTIMATE}+")
+    print(f"Image size: {image_bytes // 1024} KB  (token cost per request reported after first call)")
 
     print(f"\n{'═'*90}\n")
-    print(f"  {'#':>3}  {'Status':<6}  {'Latency':>9}  {'In(txt)':>9}  {'Out':>5}  {'TotalTxt':>9}  Response")
-    print(f"  {'─'*86}")
+    print(f"  {'#':>3}  {'Status':<6}  {'Latency':>9}  {'In/req':>8}  {'Out':>5}  {'TotalIn':>9}  {'TotalOut':>9}  Response")
+    print(f"  {'─'*88}")
 
     total_prompt     = 0
     total_completion = 0
@@ -161,24 +156,24 @@ def main():
 
     for i in range(1, repeats + 1):
         attempts = i
-        ok, latency, pt, ct, resp, raw_usage = call_once(via_proxy, image_data_uri)
+        ok, latency, pt, ct, resp, _ = call_once(via_proxy, image_data_uri)
         total_prompt     += pt
         total_completion += ct
         status = "OK   " if ok else "FAIL "
-        resp_short = resp[:46] + "…" if len(resp) > 46 else resp
-        print(f"  {i:>3}  {status}  {latency:>8.0f}ms  {pt:>9}  {ct:>5}  {total_prompt:>9}  {resp_short}")
+        resp_short = resp[:40] + "…" if len(resp) > 40 else resp
+        print(f"  {i:>3}  {status}  {latency:>8.0f}ms  {pt:>8}  {ct:>5}  {total_prompt:>9}  {total_completion:>9}  {resp_short}")
 
         if not ok:
             elapsed = time.monotonic() - run_start
             print(f"\n  --> Failed on attempt {i} after {elapsed:.1f}s")
             break
 
-    elapsed = time.monotonic() - run_start
-    est_img_total = IMAGE_TOKENS_ESTIMATE * attempts
+    elapsed  = time.monotonic() - run_start
+    avg_pt   = total_prompt // attempts if attempts else 0
+    grand_total  = total_prompt + total_completion
     print(f"\n{'═'*90}")
-    print(f"  Reported by API  — prompt (text only): {total_prompt:>9}  completion: {total_completion:>7}  total: {total_prompt + total_completion:>9}")
-    print(f"  Estimated actual — img tokens (~{IMAGE_TOKENS_ESTIMATE}/req): {est_img_total:>9}  real total ≥ {total_prompt + est_img_total + total_completion:>9}")
-    print(f"  Elapsed: {elapsed:.1f}s  |  Attempts: {attempts}")
+    print(f"  Attempts: {attempts}  |  Elapsed: {elapsed:.1f}s  |  Avg prompt tokens/req: {avg_pt}")
+    print(f"  Total prompt: {total_prompt:>9}  |  Total completion: {total_completion:>7}  |  Grand total: {grand_total:>9}")
     print(f"{'═'*90}\n")
 
 
