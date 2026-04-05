@@ -27,8 +27,9 @@ MODEL_ID    = "Llama-4-Scout-17B-16E-Instruct"
 IMAGE_URL   = "https://goodal.cz/kid/dog85.jpg"  # fetched once at startup → sent as base64
 QUESTION    = "Is it a car? Answer yes or no."
 MAX_TOKENS  = 20
-TIMEOUT     = 60
-DEFAULT_REPEATS = 30
+TIMEOUT          = 60
+DEFAULT_REPEATS  = 30
+QUOTA_LIMIT      = 1_000_000  # tokens/min limit to back-calculate real quota cost on 429
 
 # ── .env loader ─────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ def main():
     total_prompt     = 0
     total_completion = 0
     attempts         = 0
+    hit_429          = False
     run_start        = time.monotonic()
 
     for i in range(1, repeats + 1):
@@ -165,15 +167,25 @@ def main():
 
         if not ok:
             elapsed = time.monotonic() - run_start
+            hit_429 = "429" in resp
             print(f"\n  --> Failed on attempt {i} after {elapsed:.1f}s")
             break
 
-    elapsed  = time.monotonic() - run_start
-    avg_pt   = total_prompt // attempts if attempts else 0
-    grand_total  = total_prompt + total_completion
+    elapsed     = time.monotonic() - run_start
+    ok_count    = attempts - (1 if hit_429 else 0)
+    avg_pt      = total_prompt // ok_count if ok_count else 0
+    grand_total = total_prompt + total_completion
+
     print(f"\n{'═'*90}")
-    print(f"  Attempts: {attempts}  |  Elapsed: {elapsed:.1f}s  |  Avg prompt tokens/req: {avg_pt}")
-    print(f"  Total prompt: {total_prompt:>9}  |  Total completion: {total_completion:>7}  |  Grand total: {grand_total:>9}")
+    print(f"  Attempts: {attempts}  |  OK: {ok_count}  |  Elapsed: {elapsed:.1f}s")
+    print(f"  Reported by API — prompt: {total_prompt:>9}  completion: {total_completion:>7}  total: {grand_total:>9}")
+    print(f"  Avg reported tokens/req : {avg_pt:>9}")
+    if hit_429 and ok_count > 0:
+        implied = QUOTA_LIMIT // ok_count
+        ratio   = implied // avg_pt if avg_pt else "?"
+        print(f"  ── 429 hit after {ok_count} OK requests ──────────────────────────────────────────")
+        print(f"  Implied quota cost/req  : {implied:>9}  (= {QUOTA_LIMIT:,} limit ÷ {ok_count} requests)")
+        print(f"  Quota vs reported ratio : {ratio:>9}x  (image tokens cost ~{ratio}x more than usage shows)")
     print(f"{'═'*90}\n")
 
 
