@@ -65,14 +65,15 @@ GITHUB_TOKEN = (
 
 # ── Image fetch (once at startup) ────────────────────────────────────────────────
 
-def fetch_image_b64(url: str) -> str:
-    """Download image and return as base64 data URI."""
+def fetch_image_b64(url: str) -> tuple[str, int]:
+    """Download image, return (base64 data URI, raw byte size)."""
     print(f"Fetching image from {url} …", end=" ", flush=True)
     with urllib.request.urlopen(url, timeout=15) as resp:
         mime = resp.headers.get_content_type() or "image/jpeg"
-        data = base64.b64encode(resp.read()).decode()
-    print(f"OK ({len(data)//1024} KB b64)")
-    return f"data:{mime};base64,{data}"
+        raw  = resp.read()
+    data = base64.b64encode(raw).decode()
+    print(f"OK ({len(raw)//1024} KB)")
+    return f"data:{mime};base64,{data}", len(raw)
 
 # ── Request builder ──────────────────────────────────────────────────────────────
 
@@ -98,8 +99,8 @@ def post(url: str, headers: dict, body: dict) -> dict:
 
 # ── Single call ──────────────────────────────────────────────────────────────────
 
-def call_once(via_proxy: bool, image_data_uri: str) -> tuple[bool, float, int, int, str]:
-    """Returns (ok, latency_ms, prompt_tokens, completion_tokens, response_or_error)."""
+def call_once(via_proxy: bool, image_data_uri: str) -> tuple[bool, float, int, int, str, dict]:
+    """Returns (ok, latency_ms, prompt_tokens, completion_tokens, response_or_error, raw_usage)."""
     if via_proxy:
         url     = PROXY_URL
         headers = {"Content-Type": "application/json", "Authorization": f"Bearer {PROXY_KEY}"}
@@ -115,14 +116,14 @@ def call_once(via_proxy: bool, image_data_uri: str) -> tuple[bool, float, int, i
         latency = (time.monotonic() - t0) * 1000
         content = data["choices"][0]["message"]["content"].strip()
         usage   = data.get("usage", {})
-        return True, latency, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), content
+        return True, latency, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), content, usage
     except urllib.error.HTTPError as e:
         latency = (time.monotonic() - t0) * 1000
         err     = f"HTTP {e.code}: {e.read().decode()[:200]}"
-        return False, latency, 0, 0, err
+        return False, latency, 0, 0, err, {}
     except Exception as e:
         latency = (time.monotonic() - t0) * 1000
-        return False, latency, 0, 0, str(e)[:200]
+        return False, latency, 0, 0, str(e)[:200], {}
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────────
@@ -141,23 +142,31 @@ def main():
     print(f"Query : {QUESTION!r}")
     print(f"Repeat: up to {repeats}x  |  max_tokens={MAX_TOKENS}")
 
-    image_data_uri = fetch_image_b64(IMAGE_URL)
+    image_data_uri, image_bytes = fetch_image_b64(IMAGE_URL)
+    # Llama 4 Scout uses 14x14 patch grid on 560px tiles → each tile ≈ 196 tokens.
+    # Rough estimate: assume image is processed at a single 560x560 tile.
+    IMAGE_TOKENS_ESTIMATE = 196  # conservative lower-bound; real cost is likely higher
+
+    print(f"NOTE: GitHub Models API does NOT report image tokens in usage stats.")
+    print(f"      Image size: {image_bytes // 1024} KB  |  estimated image tokens/request: ~{IMAGE_TOKENS_ESTIMATE}+")
 
     print(f"\n{'═'*90}\n")
-    print(f"  {'#':>3}  {'Status':<6}  {'Latency':>9}  {'In':>7}  {'Out':>5}  {'TotalIn':>9}  Response")
+    print(f"  {'#':>3}  {'Status':<6}  {'Latency':>9}  {'In(txt)':>9}  {'Out':>5}  {'TotalTxt':>9}  Response")
     print(f"  {'─'*86}")
 
     total_prompt     = 0
     total_completion = 0
+    attempts         = 0
     run_start        = time.monotonic()
 
     for i in range(1, repeats + 1):
-        ok, latency, pt, ct, resp = call_once(via_proxy, image_data_uri)
+        attempts = i
+        ok, latency, pt, ct, resp, raw_usage = call_once(via_proxy, image_data_uri)
         total_prompt     += pt
         total_completion += ct
         status = "OK   " if ok else "FAIL "
-        resp_short = resp[:48] + "…" if len(resp) > 48 else resp
-        print(f"  {i:>3}  {status}  {latency:>8.0f}ms  {pt:>7}  {ct:>5}  {total_prompt:>9}  {resp_short}")
+        resp_short = resp[:46] + "…" if len(resp) > 46 else resp
+        print(f"  {i:>3}  {status}  {latency:>8.0f}ms  {pt:>9}  {ct:>5}  {total_prompt:>9}  {resp_short}")
 
         if not ok:
             elapsed = time.monotonic() - run_start
@@ -165,9 +174,11 @@ def main():
             break
 
     elapsed = time.monotonic() - run_start
+    est_img_total = IMAGE_TOKENS_ESTIMATE * attempts
     print(f"\n{'═'*90}")
-    print(f"  Total tokens sent:  prompt={total_prompt}  completion={total_completion}  total={total_prompt + total_completion}")
-    print(f"  Elapsed: {elapsed:.1f}s  |  Attempts: {min(i, repeats)}")
+    print(f"  Reported by API  — prompt (text only): {total_prompt:>9}  completion: {total_completion:>7}  total: {total_prompt + total_completion:>9}")
+    print(f"  Estimated actual — img tokens (~{IMAGE_TOKENS_ESTIMATE}/req): {est_img_total:>9}  real total ≥ {total_prompt + est_img_total + total_completion:>9}")
+    print(f"  Elapsed: {elapsed:.1f}s  |  Attempts: {attempts}")
     print(f"{'═'*90}\n")
 
 
