@@ -147,26 +147,28 @@ def main():
     print(f"  {'#':>3}  {'Status':<6}  {'Latency':>9}  {'In':>7}  {'Out':>5}  {'TotalIn':>9}  Response")
     print(f"  {'─'*86}")
 
-    total_prompt = 0
-    run_start    = time.monotonic()
+    total_prompt     = 0
+    total_completion = 0
+    run_start        = time.monotonic()
 
     for i in range(1, repeats + 1):
         ok, latency, pt, ct, resp = call_once(via_proxy, image_data_uri)
-        total_prompt += pt
+        total_prompt     += pt
+        total_completion += ct
         status = "OK   " if ok else "FAIL "
         resp_short = resp[:48] + "…" if len(resp) > 48 else resp
         print(f"  {i:>3}  {status}  {latency:>8.0f}ms  {pt:>7}  {ct:>5}  {total_prompt:>9}  {resp_short}")
 
         if not ok:
             elapsed = time.monotonic() - run_start
-            print(f"\n  --> Failed on attempt {i} after {elapsed:.1f}s  (total prompt tokens so far: {total_prompt})")
+            print(f"\n  --> Failed on attempt {i} after {elapsed:.1f}s")
             break
-    else:
-        elapsed = time.monotonic() - run_start
-        print(f"\n  --> Completed all {repeats} repeats in {elapsed:.1f}s")
-        print(f"  --> Total prompt tokens sent: {total_prompt}")
 
-    print(f"\n{'═'*90}\n")
+    elapsed = time.monotonic() - run_start
+    print(f"\n{'═'*90}")
+    print(f"  Total tokens sent:  prompt={total_prompt}  completion={total_completion}  total={total_prompt + total_completion}")
+    print(f"  Elapsed: {elapsed:.1f}s  |  Attempts: {min(i, repeats)}")
+    print(f"{'═'*90}\n")
 
 
 if __name__ == "__main__":
