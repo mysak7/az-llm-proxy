@@ -4,10 +4,11 @@ Azure proxy tester — volá modely pres local LiteLLM proxy (port 4003)
 a taky primo na GitHub Models API, pak porovna vysledky.
 
 Pouziti:
-  python tools/test.py                  # interaktivni vyber modelu
-  python tools/test.py all              # vsechny modely paralelne
-  python tools/test.py gpt-4o           # konkretni proxy alias
-  python tools/test.py gpt-4o direct   # jenom prime volani (bez proxy)
+  python tools/test.py                        # vypise dostupne modely
+  python tools/test.py all                    # vsechny modely paralelne
+  python tools/test.py --model gpt-4o         # konkretni model (proxy + direct)
+  python tools/test.py --model gpt-4o direct  # jenom prime volani (bez proxy)
+  python tools/test.py direct                 # vsechny modely, pouze direct
 """
 
 import asyncio
@@ -220,22 +221,20 @@ def print_comparison(proxy_res: list[Result], direct_res: list[Result]):
     print(f"{'═'*80}\n")
 
 
-# ── Interactive picker ──────────────────────────────────────────────────────────
+# ── Info printer ───────────────────────────────────────────────────────────────
 
-def pick_models() -> list[str]:
-    aliases = list(MODELS.keys())
+def print_info():
     print("\nDostupne modely:")
-    for i, a in enumerate(aliases, 1):
-        print(f"  {i:>2})  {a}")
+    print(f"  {'Alias':<28}  Model ID")
+    print(f"  {'─'*26}  {'─'*40}")
+    for alias, model_id in MODELS.items():
+        print(f"  {alias:<28}  {model_id}")
+    print(f"\nPouziti:")
+    print(f"  python tools/test.py all                    # vsechny modely paralelne")
+    print(f"  python tools/test.py --model <alias>        # konkretni model (proxy + direct)")
+    print(f"  python tools/test.py --model <alias> direct # jenom prime volani")
+    print(f"  python tools/test.py direct                 # vsechny modely, pouze direct")
     print()
-    choice = input("Cislo modelu (Enter = vsechny): ").strip()
-    if not choice:
-        return aliases
-    try:
-        return [aliases[int(choice) - 1]]
-    except (ValueError, IndexError):
-        print("Neplatna volba.")
-        sys.exit(1)
 
 
 # ── Main ────────────────────────────────────────────────────────────────────────
@@ -246,21 +245,33 @@ def main():
     only_direct = "direct" in args
     args = [a for a in args if a != "direct"]
 
-    if not args:
-        selected = pick_models()
-        via_list = ["proxy"] if not only_direct else ["direct"]
-    elif args[0] == "all":
+    # --model <alias>
+    model_arg: str | None = None
+    if "--model" in args:
+        idx = args.index("--model")
+        if idx + 1 >= len(args):
+            print("Chyba: --model vyzaduje argument.")
+            sys.exit(1)
+        model_arg = args[idx + 1]
+        args = args[:idx] + args[idx + 2:]
+
+    if not args and model_arg is None:
+        # no args at all → print info
+        print_info()
+        return
+
+    if model_arg is not None:
+        if model_arg not in MODELS:
+            print(f"Neznam alias '{model_arg}'. Dostupne: {', '.join(MODELS)}")
+            sys.exit(1)
+        selected = [model_arg]
+        via_list = ["proxy", "direct"] if not only_direct else ["direct"]
+    else:
+        # any other args (e.g. "all", "direct") → test all models
         selected = list(MODELS.keys())
         via_list = ["proxy"] if not only_direct else ["direct"]
-    else:
-        alias = args[0]
-        if alias not in MODELS:
-            print(f"Neznam alias '{alias}'. Dostupne: {', '.join(MODELS)}")
-            sys.exit(1)
-        selected = [alias]
-        via_list = ["proxy", "direct"] if not only_direct else ["direct"]
 
-    if not GITHUB_TOKEN and ("direct" in via_list or len(selected) > 0):
+    if not GITHUB_TOKEN and "direct" in via_list:
         print("VAROVANI: GITHUB_TOKEN neni nastaven — prime volani selzou.")
 
     results_by_via: dict[str, list[Result]] = {}
