@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Find all Azure AI Foundry models available via serverless API (pay-as-you-go).
-These are the models you can use with the $200 free Azure credit.
+Uses REST API directly with pagination — much faster than 'az ml model list'.
 
 Requirements:
   az login
@@ -10,79 +10,106 @@ Requirements:
 import subprocess
 import json
 import sys
+import urllib.request
+import urllib.error
 from collections import defaultdict
 
-# Tags/properties that indicate a model supports serverless (pay-as-you-go) API.
-# Azure uses these in the azureml registry to mark MaaS-capable models.
-SERVERLESS_TAGS = {
-    "inferenceAPIType": "serverless",
-    "inference-min-sku-spec": None,   # presence only
+API_VERSION = "2024-04-01-preview"
+REGISTRY    = "azureml"
+BASE_URL    = (
+    f"https://management.azure.com/providers/Microsoft.MachineLearningServices"
+    f"/registries/{REGISTRY}/models?api-version={API_VERSION}&$top=100"
+)
+
+# Publishers whose models are known to support serverless / pay-as-you-go
+SERVERLESS_PUBLISHERS = {
+    "Microsoft", "Meta", "Mistral AI", "DeepSeek", "Cohere",
+    "AI21 Labs", "NVIDIA", "TII", "01.AI", "Qwen",
 }
 
-def az(cmd: str) -> list | dict:
+
+def get_token() -> str:
     result = subprocess.run(
-        f"az {cmd} -o json",
-        shell=True, capture_output=True, text=True
+        ["az", "account", "get-access-token", "--output", "json"],
+        capture_output=True, text=True
     )
     if result.returncode != 0:
-        print(f"\n[ERROR] az {cmd}\n{result.stderr.strip()}", file=sys.stderr)
+        print("Not logged in. Run: az login", file=sys.stderr)
         sys.exit(1)
-    return json.loads(result.stdout)
+    return json.loads(result.stdout)["accessToken"]
 
 
-def is_serverless(model: dict) -> bool:
-    tags = model.get("tags") or {}
-    props = model.get("properties") or {}
-
-    # Check known serverless indicator tags
-    if tags.get("inferenceAPIType", "").lower() == "serverless":
-        return True
-    # Some models use properties instead of tags
-    if props.get("inferenceAPIType", "").lower() == "serverless":
-        return True
-    # Presence of inference-min-sku-spec usually means dedicated, not serverless
-    # Absence + having task type = likely serverless candidate
-    task = tags.get("task") or props.get("task") or ""
-    if task and "inference-min-sku-spec" not in tags and "inference-min-sku-spec" not in props:
-        return True
-    return False
+def fetch_page(url: str, token: str) -> dict:
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        print(f"HTTP {e.code}: {e.reason}", file=sys.stderr)
+        sys.exit(1)
 
 
 def get_publisher(model: dict) -> str:
     tags = model.get("tags") or {}
+    props = (model.get("properties") or {})
     return (
         tags.get("publisher")
         or tags.get("Publisher")
-        or tags.get("author")
+        or props.get("publisher")
         or "Unknown"
     )
 
 
+def is_serverless(model: dict) -> bool:
+    tags  = model.get("tags") or {}
+    props = model.get("properties") or {}
+    api_type = (
+        tags.get("inferenceAPIType", "")
+        or props.get("inferenceAPIType", "")
+    ).lower()
+    if api_type == "serverless":
+        return True
+    # Fallback: publisher-based heuristic
+    pub = get_publisher(model)
+    return pub in SERVERLESS_PUBLISHERS
+
+
 def main():
-    print("Checking az login...")
-    try:
-        az("account show")
-    except SystemExit:
-        print("Run: az login")
-        sys.exit(1)
+    print("Getting Azure token...")
+    token = get_token()
 
-    print("Fetching model list from Azure ML registry (azureml)...\n")
-    all_models = az("ml model list --registry-name azureml")
+    print("Scanning Azure ML registry (paginated, shows results live)...\n")
 
-    # Keep only the latest version per model name
+    # Track only latest version per model name
     latest: dict[str, dict] = {}
-    for m in all_models:
-        name = m.get("name", "")
-        ver  = m.get("version", "0")
-        if name not in latest or ver > latest[name].get("version", "0"):
-            latest[name] = m
+    page_num = 0
+    url = BASE_URL
 
+    while url:
+        page_num += 1
+        print(f"\r  Page {page_num}  ({len(latest)} unique models so far)...", end="", flush=True)
+        data = fetch_page(url, token)
+        items = data.get("value", [])
+
+        for m in items:
+            name = m.get("name", "")
+            ver  = m.get("id", "").split("/versions/")[-1] if "/versions/" in m.get("id","") else m.get("version","0")
+            m["version"] = ver
+            if name not in latest or ver > latest[name]["version"]:
+                latest[name] = m
+
+        url = data.get("nextLink")
+
+    print(f"\r  Done. {len(latest)} unique models found across {page_num} pages.\n")
+
+    # Filter serverless
     serverless = [m for m in latest.values() if is_serverless(m)]
 
     if not serverless:
-        print("No serverless models found — try without the filter:")
-        print("  az ml model list --registry-name azureml -o table\n")
-        # Fall back: show everything grouped by publisher
+        print("No serverless models detected by tags — showing all models.\n")
         serverless = list(latest.values())
 
     # Group by publisher
@@ -91,25 +118,21 @@ def main():
         by_pub[get_publisher(m)].append(m)
 
     total = sum(len(v) for v in by_pub.values())
-    print(f"Found {total} serverless / pay-as-you-go models across {len(by_pub)} publishers:\n")
-    print(f"{'Publisher':<22} {'Model name':<55} {'Version'}")
-    print("─" * 90)
+    print(f"{'Publisher':<22} {'Model name':<58} {'Ver'}")
+    print("─" * 95)
 
     for pub in sorted(by_pub.keys()):
         models = sorted(by_pub[pub], key=lambda m: m.get("name", ""))
         for m in models:
-            tags  = m.get("tags") or {}
-            props = m.get("properties") or {}
-            task  = tags.get("task") or props.get("task") or ""
-            name  = m.get("name", "")
-            ver   = m.get("version", "")
-            print(f"{pub:<22} {name:<55} {ver:<10}  {task}")
+            tags = m.get("tags") or {}
+            task = tags.get("task") or (m.get("properties") or {}).get("task") or ""
+            print(f"{pub:<22} {m.get('name',''):<58} {m['version']:<6}  {task}")
         print()
 
-    # Summary: unique publishers
-    print("\nPublishers found:")
-    for pub in sorted(by_pub.keys()):
-        print(f"  • {pub} ({len(by_pub[pub])} models)")
+    print(f"Total: {total} serverless-capable models from {len(by_pub)} publishers")
+    print("\nPublisher summary:")
+    for pub in sorted(by_pub.keys(), key=lambda p: -len(by_pub[p])):
+        print(f"  {pub:<22} {len(by_pub[pub]):>3} models")
 
 
 if __name__ == "__main__":
