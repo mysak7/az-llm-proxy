@@ -1,0 +1,16 @@
+services:
+  az-proxy:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: az-proxy
+    ports:
+      - "4003:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+    command:
+      - "--config"
+      - "/app/config.yaml"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - STORE_MODEL_IN_DB=False
+    restart: unless-stopped

@@ -1,0 +1,143 @@
+router_settings:
+  # Strategy for load balancing across multiple backends of the same model.
+  # Switch to "usage-based-routing-v2" when adding more regions / API keys.
+  routing_strategy: simple-shuffle
+  num_retries: 3
+  retry_after: 5
+
+litellm_settings:
+  set_verbose: false
+  drop_params: true        # silently ignore unknown params (e.g. reasoning_effort)
+
+# ── Model list ─────────────────────────────────────────────────────────────────
+# Each entry maps a friendly model_name (what clients send) to a backend.
+# To add throughput later: duplicate any block with a different api_key /
+# azure_ai region and give it the same model_name — LiteLLM load-balances
+# automatically across all entries sharing the same name.
+#
+# Example — adding a second GitHub token for higher RPM:
+#   - model_name: gpt-4o
+#     litellm_params:
+#       model: openai/gpt-4o
+#       api_base: https://models.inference.ai.azure.com
+#       api_key: os.environ/GITHUB_TOKEN_2
+#
+# Example — adding a real Azure OpenAI regional deployment:
+#   - model_name: gpt-4o
+#     litellm_params:
+#       model: azure/gpt-4o
+#       api_base: https://my-resource.openai.azure.com
+#       api_version: "2024-02-01"
+#       api_key: os.environ/AZURE_OPENAI_KEY_EASTUS
+# ──────────────────────────────────────────────────────────────────────────────
+
+model_list:
+
+  # ── OpenAI ──────────────────────────────────────────────────────────────────
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ── Microsoft Phi ────────────────────────────────────────────────────────────
+  - model_name: phi-4
+    litellm_params:
+      model: openai/Phi-4
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ── Meta Llama 3.x ──────────────────────────────────────────────────────────
+  - model_name: llama-3.3-70b
+    litellm_params:
+      model: openai/Llama-3.3-70B-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: llama-3.2-90b-vision
+    litellm_params:
+      model: openai/Llama-3.2-90B-Vision-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: llama-3.2-11b-vision
+    litellm_params:
+      model: openai/Llama-3.2-11B-Vision-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: llama-3.1-405b
+    litellm_params:
+      model: openai/Meta-Llama-3.1-405B-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: llama-3.1-8b
+    litellm_params:
+      model: openai/Meta-Llama-3.1-8B-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ── Meta Llama 4 ────────────────────────────────────────────────────────────
+  - model_name: llama-4-scout
+    litellm_params:
+      model: openai/Llama-4-Scout-17B-16E-Instruct
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: llama-4-maverick
+    litellm_params:
+      model: openai/Llama-4-Maverick-17B-128E-Instruct-FP8
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ── Mistral / Codestral ──────────────────────────────────────────────────────
+  - model_name: codestral
+    litellm_params:
+      model: openai/Codestral-2501
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: mistral-medium
+    litellm_params:
+      model: openai/mistral-medium-2505
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ── DeepSeek ────────────────────────────────────────────────────────────────
+  - model_name: deepseek-r1
+    litellm_params:
+      model: openai/DeepSeek-R1
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: deepseek-r1-0528
+    litellm_params:
+      model: openai/DeepSeek-R1-0528
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: deepseek-v3
+    litellm_params:
+      model: openai/DeepSeek-V3-0324
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  # ── xAI Grok ────────────────────────────────────────────────────────────────
+  - model_name: grok-3
+    litellm_params:
+      model: openai/grok-3
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
+
+  - model_name: grok-3-mini
+    litellm_params:
+      model: openai/grok-3-mini
+      api_base: https://models.inference.ai.azure.com
+      api_key: os.environ/GITHUB_TOKEN
