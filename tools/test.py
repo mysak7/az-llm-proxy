@@ -23,8 +23,8 @@ from dataclasses import dataclass
 
 PROXY_URL  = "http://localhost:4003/v1/chat/completions"
 DIRECT_URL = "https://llm-development-artifacts.services.ai.azure.com/models/chat/completions"
-PROMPT     = "In one sentence, what is the capital of France?"
-MAX_TOKENS = 80
+PROMPT     = "What AI model are you? Answer in one sentence."
+MAX_TOKENS = 200
 TIMEOUT    = 60
 
 MODELS: dict[str, str] = {
@@ -131,9 +131,8 @@ def print_results(results: list[Result]):
     print(f"  {'Via':<8} {'Model alias':<20}  {'Latency':>9}  {'In':>6}  {'Out':>5}  Response")
     print(f"  {'─'*96}")
     for r in sorted(ok, key=lambda x: x.latency_ms):
-        resp = r.response[:55] + "…" if len(r.response) > 55 else r.response
         print(f"  {r.via:<8} {r.alias:<20}  {r.latency_ms:>8.0f}ms  "
-              f"{r.prompt_tokens:>6}  {r.completion_tokens:>5}  {resp}")
+              f"{r.prompt_tokens:>6}  {r.completion_tokens:>5}  {r.response}")
     if err:
         print(f"\n  {'─'*96}")
         for r in err:
