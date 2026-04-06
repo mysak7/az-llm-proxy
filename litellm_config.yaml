@@ -37,3 +37,5 @@ model_list:
       model: openai/Phi-4-multimodal-instruct
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
       api_key: os.environ/AZURE_AI_KEY
+    model_info:
+      supports_function_calling: false
