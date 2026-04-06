@@ -12,19 +12,19 @@ litellm_settings:
 
 model_list:
 
-  - model_name: DeepSeek-V3.2-Speciale
+  - model_name: deepseek-v3.2-speciale
     litellm_params:
       model: openai/DeepSeek-V3.2-Speciale
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
       api_key: os.environ/AZURE_AI_KEY
 
-  - model_name: Phi-4-reasoning
+  - model_name: phi-4-reasoning
     litellm_params:
       model: openai/Phi-4-reasoning
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
       api_key: os.environ/AZURE_AI_KEY
 
-  - model_name: Phi-4
+  - model_name: phi-4
     litellm_params:
       model: openai/Phi-4
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
@@ -32,7 +32,7 @@ model_list:
     model_info:
       supports_function_calling: false
 
-  - model_name: Phi-4-multimodal-instruct
+  - model_name: phi-4-multimodal-instruct
     litellm_params:
       model: openai/Phi-4-multimodal-instruct
       api_base: https://llm-development-artifacts.services.ai.azure.com/models
