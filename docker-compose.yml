@@ -12,5 +12,28 @@ services:
     environment:
       - AZURE_AI_KEY=${AZURE_AI_KEY}
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
-      - STORE_MODEL_IN_DB=False
+      - STORE_MODEL_IN_DB=True
+      - DATABASE_URL=postgresql://litellm:${POSTGRES_PASSWORD}@db:5432/litellm
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: az-proxy-db
+    environment:
+      - POSTGRES_USER=litellm
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=litellm
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
