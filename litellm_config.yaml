@@ -9,7 +9,7 @@ router_settings:
 litellm_settings:
   set_verbose: false
   drop_params: true
-  callbacks: custom_hooks.PhiToolChoiceFix
+  callbacks: ["custom_hooks.phi_tool_choice_fix"]
 
 model_list:
 

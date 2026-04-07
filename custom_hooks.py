@@ -14,3 +14,7 @@ class PhiToolChoiceFix(CustomLogger):
         if "phi" in model and "tool_choice" in data:
             del data["tool_choice"]
         return data
+
+
+# Module-level instance required for LiteLLM proxy callback registration
+phi_tool_choice_fix = PhiToolChoiceFix()
