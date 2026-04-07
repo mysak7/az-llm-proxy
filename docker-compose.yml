@@ -6,6 +6,7 @@ services:
       - "4003:4000"
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
+      - ./custom_hooks.py:/app/custom_hooks.py:ro
     command:
       - "--config"
       - "/app/config.yaml"
