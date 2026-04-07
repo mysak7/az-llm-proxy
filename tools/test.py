@@ -149,6 +149,7 @@ def print_results(results: list[Result]):
 # ── Tool calling test ───────────────────────────────────────────────────────────
 
 TOOL_PROMPT = "What is the weather in Prague and in Tokyo?"
+TOOL_MAX_TOKENS = 500
 
 TOOLS = [
     {
@@ -201,7 +202,7 @@ def call_tool(alias: str, via: str) -> ToolResult:
             "model": model,
             "messages": [{"role": "user", "content": TOOL_PROMPT}],
             "tools": TOOLS,
-            "max_tokens": 300,
+            "max_tokens": TOOL_MAX_TOKENS,
         }
         data    = _post(url, headers, body)
         latency = (time.monotonic() - t0) * 1000
